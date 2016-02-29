@@ -1,0 +1,17 @@
+{
+	"folders":
+	[
+		{
+			"follow_symlinks": true,
+			"path": "."
+		}
+	],
+     "build_systems":
+    [
+        {
+            "name": "Build",
+            "cmd": [ "make", "-j8", "-C", "${project_path}/build" ],
+            "file_regex": "^(..[^:\n]*):([0-9]+):?([0-9]+)?:? (.*)$"
+        }
+    ]
+}
