@@ -2,6 +2,8 @@
 
 #include "Midi.h"
 
+#include <cstring>
+
 BLM::BLM() :
     _colors(2),
     _cols(16),
