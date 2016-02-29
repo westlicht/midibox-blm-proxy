@@ -10,36 +10,26 @@ class MidiMessage {
 public:
     MidiMessage(int data0, int data1, int data2)
     {
-        _data[0] = data0;
-        _data[1] = data1;
-        _data[2] = data2;
+        _data.emplace_back(data0);
+        _data.emplace_back(data1);
+        _data.emplace_back(data2);
         _valid = true;
     }
 
     MidiMessage(const std::vector<uint8_t> &data)
     {
-        if (data.size() == 3) {
-            _data[0] = data[0];
-            _data[1] = data[1];
-            _data[2] = data[2];
-            _valid = true;
-        }
+        _data = data;
+        _valid = true;
     }
 
     bool isValid() const { return _valid; }
 
-    const std::array<uint8_t, 3> &data() const { return _data; }
-    std::vector<uint8_t> dataAsVector() const
+    const std::vector<uint8_t> &data() const { return _data; }
+
+    int event() const
     {
-        std::vector<uint8_t> data(3);
-        data[0] = _data[0];
-        data[1] = _data[1];
-        data[2] = _data[2];
-        return data;
+        return _data[0] >> 4;
     }
-    uint8_t data0() const { return _data[0]; }
-    uint8_t data1() const { return _data[1]; }
-    uint8_t data2() const { return _data[2]; }
 
     int channel() const
     {
@@ -54,6 +44,11 @@ public:
     int velocity() const
     {
         return _data[2];
+    }
+
+    bool isSysex() const
+    {
+        return _data[0] == 0xf0;
     }
 
     bool isNoteOn() const
@@ -94,7 +89,7 @@ public:
         } else if (msg.isNoteOff()) {
             os << tfm::format("MidiMessage[type=NoteOff,channel=%d,note=%d,velocity=%d]", msg.channel(), msg.note(), msg.velocity());
         } else if (msg.isControlChange()) {
-            os << tfm::format("MidiMessage[type=ControlChange,channel=%d,controller=%d,value=%d]", msg.channel(), msg.data1(), msg.data2());
+            os << tfm::format("MidiMessage[type=ControlChange,channel=%d,controller=%d,value=%d]", msg.channel(), msg.data()[1], msg.data()[2]);
         } else {
             os << tfm::format("MidiMessage[type=Unknown,channel=%d,data=", msg.channel());
             for (auto d : msg.data()) {
@@ -107,6 +102,5 @@ public:
 
 private:
     bool _valid = false;
-    std::array<uint8_t, 3> _data;
-
+    std::vector<uint8_t> _data;
 };

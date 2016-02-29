@@ -15,6 +15,9 @@ int main()
     while (true) {
         Midi::update();
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        blm.dump();
+        std::cout << std::endl;
     }
 
     return 0;

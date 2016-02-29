@@ -17,7 +17,7 @@ public:
     void sendMessage(const MidiMessage &msg)
     {
         if (_midiOut.isPortOpen()) {
-            auto data = msg.dataAsVector();
+            auto data = msg.data();
             _midiOut.sendMessage(&data);
         }
     }
