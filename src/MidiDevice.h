@@ -2,7 +2,7 @@
 
 #include "MidiMessage.h"
 
-#include "RtMidi.h"
+#include <RtMidi/RtMidi.h>
 
 #include <string>
 

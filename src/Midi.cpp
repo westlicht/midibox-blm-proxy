@@ -1,6 +1,6 @@
 #include "Midi.h"
 
-#include "RtMidi.h"
+#include <RtMidi/RtMidi.h>
 
 std::vector<std::string> Midi::_inputPorts;
 std::vector<std::string> Midi::_outputPorts;

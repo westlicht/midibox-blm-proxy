@@ -1,10 +1,10 @@
 #pragma once
 
+#include <tinyformat/tinyformat.h>
+
 #include <array>
 #include <vector>
 #include <cstdint>
-
-#include "tinyformat.h"
 
 class MidiMessage {
 public:

@@ -34,12 +34,14 @@ endif()
 
 
 set(SOURCES
+    ext/RtMidi/RtMidi.cpp
     src/BLM.cpp
     src/LaunchpadController.cpp
     src/Midi.cpp
-    src/RtMidi.cpp
     src/main.cpp
 )
+
+include_directories(ext)
 
 add_executable(blm-proxy ${SOURCES})
 target_link_libraries(blm-proxy ${EXTRA_LIBS})
