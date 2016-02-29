@@ -17,16 +17,19 @@ else()
     message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
 
-set(LIBS "")
+set(EXTRA_LIBS "")
 
 if(APPLE)
+    find_library(COREMIDI_LIBRARY CoreMIDI)
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation)
+    find_library(COREAUDIO_LIBRARY CoreAudio)
+    set(EXTRA_LIBS ${COREMIDI_LIBRARY} ${COREFOUNDATION_LIBRARY} ${COREAUDIO_LIBRARY})
     add_definitions("-D__MACOSX_CORE__")
-    set(LIBS "${LIBS} -framework CoreMIDI -framework CoreFoundation -framework CoreAudio")
 elseif(UNIX)
-    add_definitions("-D__LINUX_ALSA__")
     find_package(ALSA REQUIRED)
-    set(LIBS "${LIBS} -lpthread ${ALSA_LIBRARIES}")
+    set(EXTRA_LIBS -lpthread ${ALSA_LIBRARIES})
     include_directories(${ALSA_INCLUDE_DIRS})
+    add_definitions("-D__LINUX_ALSA__")
 endif()
 
 
@@ -39,5 +42,5 @@ set(SOURCES
 )
 
 add_executable(blm-proxy ${SOURCES})
-target_link_libraries(blm-proxy ${LIBS})
+target_link_libraries(blm-proxy ${EXTRA_LIBS})
 
