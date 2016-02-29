@@ -23,6 +23,10 @@ if(APPLE)
     add_definitions("-D__MACOSX_CORE__")
     set(LIBS "${LIBS} -framework CoreMIDI -framework CoreFoundation -framework CoreAudio")
 elseif(UNIX)
+    add_definitions("-D__LINUX_ALSA__")
+    find_package(ALSA REQUIRED)
+    set(LIBS "${LIBS} -lpthread ${ALSA_LIBRARIES}")
+    include_directories(${ALSA_INCLUDE_DIRS})
 endif()
 
 
