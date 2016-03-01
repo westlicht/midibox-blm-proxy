@@ -43,6 +43,8 @@ void Midi::update()
             }
         }
 
+        // TODO this assumes that input and output ports are in the same order!
+
         for (int i = 0; i < _inputPorts.size(); ++i) {
             for (auto device : _devices) {
                 if (!device->_connected && device->_midiPort == _inputPorts[i]) {

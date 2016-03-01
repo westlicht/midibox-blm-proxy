@@ -7,11 +7,11 @@
 BLM::BLM() :
     _colors(2),
     _cols(16),
-    _rows(16),
+    _rows(8),
     _controller(nullptr)
 {
     std::memset(_buttonState, sizeof(_buttonState), 0);
-    Midi::addDevice(this, "Launchpad");
+    Midi::addDevice(this, "MIDIbox SEQ V4 Port 3");
 }
 
 BLM::~BLM()
@@ -22,11 +22,16 @@ BLM::~BLM()
 void BLM::connected()
 {
     std::cout << "BLM connected!" << std::endl;
+
+    sendLayout();
+    startTimer(5000);
 }
 
 void BLM::disconnected()
 {
     std::cout << "BLM disconnected!" << std::endl;
+
+    stopTimer();
 }
 
 void BLM::handleMessage(const MidiMessage &msg)
@@ -34,6 +39,22 @@ void BLM::handleMessage(const MidiMessage &msg)
     //std::cout << "BLM input: " << msg << std::endl;
 
     handleBlmMessage(msg);
+}
+
+void BLM::handleTimer()
+{
+    sendAck();
+}
+
+void BLM::setController(Controller *controller)
+{
+    if (_controller) {
+        _controller->setBLM(nullptr);
+    }
+    _controller = controller;
+    if (_controller) {
+        _controller->setBLM(this);
+    }
 }
 
 int BLM::buttonState(int col, int row) const
@@ -200,9 +221,9 @@ void BLM::handleBlmMessage(const MidiMessage &msg)
         {
             if (data[6] == 0x00 && data[7] == 0x00) {
                 // no error checking... just send layout (the hardware version will check better)
-                //sendBLMLayout();
+                sendLayout();
             } else if (data[6] == 0x0f && data[7] == 0xf7) {
-                //sendAck();
+                sendAck();
             }
         }
     } break;
@@ -226,8 +247,7 @@ void BLM::sendLayout()
     sysex[11] = 1; // number of extra columns
     sysex[12] = 1; // number of extra buttons (e.g. shift)
     sysex[13] = 0xf7;
-    MidiMessage msg(sysex);
-    sendMessage(msg);
+    sendMessage(MidiMessage(sysex));
 }
 
 void BLM::sendAck()
@@ -242,8 +262,12 @@ void BLM::sendAck()
     sysex[6] = 0x0f; // Acknowledge
     sysex[7] = 0x00; // dummy
     sysex[8] = 0xf7;
-    MidiMessage msg(sysex);
-    sendMessage(msg);
+    sendMessage(MidiMessage(sysex));
+}
+
+void BLM::sendNoteEvent(int channel, int note, int velocity)
+{
+    sendMessage(MidiMessage(0x90 | channel, note, velocity));
 }
 
 void BLM::dump()

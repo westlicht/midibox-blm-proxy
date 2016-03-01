@@ -2,15 +2,20 @@
 
 #include "MidiDevice.h"
 #include "Controller.h"
+#include "Timer.h"
 
-class BLM : public MidiDevice {
+class BLM : public MidiDevice, public Timer {
 public:
     BLM();
     ~BLM();
 
+    // MidiDevice
     void connected() override;
     void disconnected() override;
     void handleMessage(const MidiMessage &msg) override;
+
+    // Timer
+    void handleTimer() override;
 
     void setController(Controller *controller);
 
@@ -25,6 +30,7 @@ public:
 
     void sendLayout();
     void sendAck();
+    void sendNoteEvent(int channel, int note, int velocity);
 
     void dump();
 

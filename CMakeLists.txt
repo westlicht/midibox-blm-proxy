@@ -37,7 +37,9 @@ set(SOURCES
     ext/RtMidi/RtMidi.cpp
     src/BLM.cpp
     src/LaunchpadController.cpp
+    src/LaunchpadDevice.cpp
     src/Midi.cpp
+    src/Timer.cpp
     src/main.cpp
 )
 
