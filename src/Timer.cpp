@@ -1,6 +1,7 @@
 #include "Timer.h"
 
 #include <chrono>
+#include <algorithm>
 
 std::vector<Timer *> Timer::_timers;
 

@@ -45,11 +45,15 @@ void Midi::update()
 
         // TODO this assumes that input and output ports are in the same order!
 
+        auto isMatchingPort = [] (const std::string &a, const std::string &b) {
+            return b.compare(0, a.size(), a) == 0;
+        };
+
         for (int i = 0; i < _inputPorts.size(); ++i) {
             for (auto device : _devices) {
-                if (!device->_connected && device->_midiPort == _inputPorts[i]) {
-                    device->_midiIn.setCallback(callback, device);
+                if (!device->_connected && isMatchingPort(device->_midiPort, _inputPorts[i])) {
                     device->_midiIn.openPort(i);
+                    device->_midiIn.setCallback(callback, device);
                     device->_midiOut.openPort(i);
                     device->_connected = true;
                     device->connected();

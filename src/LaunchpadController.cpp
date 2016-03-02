@@ -35,7 +35,7 @@ void LaunchpadController::handleMessage(LaunchpadDevice *device, const MidiMessa
     int data1 = data[1];
     int data2 = data[2];
 
-    std::cout << "launchpad event " << msg << std::endl;
+    std::cout << tfm::format("Launchpad %d event %s", device->index(), msg) << std::endl;
 
     int deviceIndex = device->index();
 

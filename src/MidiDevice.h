@@ -7,6 +7,7 @@
 #include <string>
 #include <thread>
 #include <algorithm>
+#include <mutex>
 
 class MidiDevice {
 public:
