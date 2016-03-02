@@ -10,7 +10,7 @@ BLM::BLM() :
     _rows(8),
     _controller(nullptr)
 {
-    std::memset(_buttonState, sizeof(_buttonState), 0);
+    std::memset(_buttonState, 0, sizeof(_buttonState));
     Midi::addDevice(this, "MIDIbox SEQ V4 Port 3");
 }
 
