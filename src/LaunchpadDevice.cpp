@@ -12,6 +12,9 @@ LaunchpadDevice::LaunchpadDevice(LaunchpadController *controller, int index) :
     _buttonPressed(128, false)
 {
     std::string port = Settings::instance().json()["launchpad"]["port"].string_value();
+    if (port.empty()) {
+        throw Exception("Invalid Launchpad MIDI port '%s'", port);
+    }
     Midi::addDevice(this, port);
 }
 

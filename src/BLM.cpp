@@ -1,6 +1,7 @@
 #include "BLM.h"
 #include "Midi.h"
 #include "Debug.h"
+#include "Settings.h"
 
 #include <cstring>
 
@@ -11,7 +12,12 @@ BLM::BLM() :
     _controller(nullptr)
 {
     std::memset(_buttonState, 0, sizeof(_buttonState));
-    Midi::addDevice(this, "MIDIbox SEQ V4 Port 3");
+
+    std::string port = Settings::instance().json()["blm"]["port"].string_value();
+    if (port.empty()) {
+        throw Exception("Invalid BLM MIDI port '%s'", port);
+    }
+    Midi::addDevice(this, port);
 }
 
 BLM::~BLM()
