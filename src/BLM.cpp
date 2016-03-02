@@ -1,6 +1,6 @@
 #include "BLM.h"
-
 #include "Midi.h"
+#include "Debug.h"
 
 #include <cstring>
 
@@ -21,7 +21,7 @@ BLM::~BLM()
 
 void BLM::connected()
 {
-    std::cout << "BLM connected!" << std::endl;
+    DBG("BLM connected");
 
     sendLayout();
     startTimer(5000);
@@ -29,14 +29,14 @@ void BLM::connected()
 
 void BLM::disconnected()
 {
-    std::cout << "BLM disconnected!" << std::endl;
+    DBG("BLM disconnected");
 
     stopTimer();
 }
 
 void BLM::handleMessage(const MidiMessage &msg)
 {
-    //std::cout << "BLM input: " << msg << std::endl;
+    //DBG("BLM received %s", msg);
 
     handleBlmMessage(msg);
 }

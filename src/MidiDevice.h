@@ -25,22 +25,11 @@ public:
         }
     }
 
-    void sendMessageBuffered(const MidiMessage &msg)
-    {
-        if (_midiOut.isPortOpen()) {
-            std::lock_guard<std::mutex> lock(_outputBufferMutex);
-            std::copy(msg.data().begin(), msg.data().end(), std::back_inserter(_outputBuffer));
-        }
-    }
-
 private:
     std::string _midiPort;
     RtMidiIn _midiIn;
     RtMidiOut _midiOut;
     bool _connected = false;
-
-    std::vector<uint8_t> _outputBuffer;
-    std::mutex _outputBufferMutex;
 
     friend class Midi;
 };

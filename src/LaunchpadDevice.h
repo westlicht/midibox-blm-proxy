@@ -2,6 +2,8 @@
 
 #include "MidiDevice.h"
 
+#include <vector>
+
 class LaunchpadController;
 
 class LaunchpadDevice : public MidiDevice {
@@ -21,6 +23,11 @@ public:
     Rotation rotation() const { return _rotation; }
     void setRotation(Rotation rotation);
 
+    void clearLeds();
+    void setGridLed(int x, int y, int state);
+
+    static int stateToVelocity(int state);
+
     // MidiDevice
     void connected() override;
     void disconnected() override;
@@ -30,4 +37,6 @@ private:
     LaunchpadController *_controller;
     int _index;
     Rotation _rotation;
+
+    std::vector<bool> _buttonPressed;
 };

@@ -35,11 +35,14 @@ endif()
 
 set(SOURCES
     ext/RtMidi/RtMidi.cpp
+    ext/json11/json11.cpp
     src/BLM.cpp
+    src/Debug.cpp
     src/LaunchpadController.cpp
     src/LaunchpadDevice.cpp
     src/Midi.cpp
     src/Timer.cpp
+    src/Settings.cpp
     src/main.cpp
 )
 

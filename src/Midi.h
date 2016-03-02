@@ -15,6 +15,8 @@ public:
     static const std::vector<std::string> &outputPorts() { return _outputPorts; }
 
 private:
+    static void checkDevices();
+
     static std::vector<std::string> _inputPorts;
     static std::vector<std::string> _outputPorts;
     static std::vector<MidiDevice *> _devices;
