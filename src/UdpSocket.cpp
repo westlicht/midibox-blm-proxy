@@ -1,5 +1,7 @@
 #include "UdpSocket.h"
 
+#include <cstring>
+
 #ifdef WIN32
   #include <winsock2.h>
 #else
@@ -59,7 +61,7 @@ bool UdpSocket::connect(const std::string &host, int portRead, int portWrite)
 	}
 
 	// Get remote address
-    memcpy(&_remoteAddress, hostInfo->h_addr, hostInfo->h_length);
+    std::memcpy(&_remoteAddress, hostInfo->h_addr, hostInfo->h_length);
 
     hostAddr.sin_addr.s_addr=INADDR_ANY;
     hostAddr.sin_port=htons(portRead);
