@@ -43,6 +43,7 @@ set(SOURCES
     src/Midi.cpp
     src/Timer.cpp
     src/Settings.cpp
+    src/UdpSocket.cpp
     src/main.cpp
 )
 
