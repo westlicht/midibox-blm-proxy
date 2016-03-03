@@ -7,6 +7,7 @@
 class Midi {
 public:
     static void update();
+    static void shutdown();
 
     static void addDevice(MidiDevice *device, const std::string &name);
     static void removeDevice(MidiDevice *device);

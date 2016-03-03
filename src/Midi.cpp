@@ -15,15 +15,34 @@ static void callback(double timeStamp, std::vector<unsigned char> *message, void
     }
 }
 
+static void errorCallback(RtMidiError::Type type, const std::string &errorText, void *user)
+{
+    DBG("RtMidi error: %s", errorText);
+}
+
 void Midi::update()
 {
     checkDevices();
+}
+
+void Midi::shutdown()
+{
+    for (auto device : _devices) {
+        if (device->_connected) {
+            device->disconnected();
+            device->_midiIn.closePort();
+            device->_midiOut.closePort();
+            device->_connected = false;
+        }
+    }
 }
 
 void Midi::addDevice(MidiDevice *device, const std::string &name)
 {
     device->_midiPort = name;
     device->_connected = false;
+    device->_midiIn.setErrorCallback(errorCallback, device);
+    device->_midiOut.setErrorCallback(errorCallback, device);
     _devices.emplace_back(device);
 }
 
