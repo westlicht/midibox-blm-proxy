@@ -35,10 +35,6 @@ int main(int argc, char *argv[])
     ("l,list-midi-devices", "List MIDI devices", cxxopts::value<bool>(listDevices))
     ("d,debug-mode", "Enable debug mode", cxxopts::value<bool>(debugMode))
     ("t,text-mode", "Output BLM on console", cxxopts::value<bool>(textMode))
-//    ("task", tfm::format("Processing task (default: %s)", settings.task), cxxopts::value<std::string>(settings.task), "")
-//    ("startFrame", tfm::format("First frame to process (default: %d)", settings.startFrame), cxxopts::value<int>(settings.startFrame), "")
-//    ("endFrame", tfm::format("Last frame to process (default: %d)", settings.endFrame), cxxopts::value<int>(settings.endFrame), "")
-//    ("input", "Input files", cxxopts::value<std::vector<std::string>>())
     ;
 
     // Parse command line arguments
