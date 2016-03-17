@@ -8,6 +8,14 @@ class LaunchpadController;
 
 class LaunchpadDevice : public MidiDevice {
 public:
+    enum Corner {
+        TopLeft,
+        TopRight,
+        BottomRight,
+        BottomLeft,
+        Invalid,
+    };
+
     enum Rotation {
         Rotation0,
         Rotation90,
@@ -27,6 +35,9 @@ public:
     void setGridLed(int x, int y, int state);
 
     static int stateToVelocity(int state);
+    static Corner noteToCorner(int note);
+    static Rotation computeRotation(Corner source, Corner target);
+
 
     // MidiDevice
     void connected() override;

@@ -2,11 +2,10 @@
 
 #include "Controller.h"
 #include "MidiMessage.h"
+#include "LaunchpadDevice.h"
 
 #include <vector>
 #include <memory>
-
-class LaunchpadDevice;
 
 class LaunchpadController : public Controller {
 public:
@@ -15,6 +14,7 @@ public:
 
     void handleMessage(LaunchpadDevice *device, const MidiMessage &msg);
     void startCalibration();
+    void finishCalibration();
 
     void clearLeds() override;
     void setGridLed(int x, int y, int state) override;
@@ -26,6 +26,8 @@ private:
     static const int MaxDevices = 4;
 
     std::vector<std::unique_ptr<LaunchpadDevice>> _devices;
+    std::vector<int> _deviceMap;
+    std::vector<int> _revDeviceMap;
 
     enum State {
         Normal,
@@ -33,5 +35,5 @@ private:
     };
     State _state;
 
-    std::vector<std::pair<int, int>> _calibrationData;
+    std::vector<std::pair<int, LaunchpadDevice::Corner>> _calibrationData;
 };

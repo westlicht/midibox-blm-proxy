@@ -35,7 +35,7 @@ void LaunchpadDevice::clearLeds()
 
 void LaunchpadDevice::setGridLed(int x, int y, int state)
 {
-    sendMessage(MidiMessage(0x90, y * 16 + x, stateToVelocity(state)));
+    sendMessage(MidiMessage::noteOn(0, y * 16 + x, stateToVelocity(state)));
 }
 
 int LaunchpadDevice::stateToVelocity(int state)
@@ -46,6 +46,22 @@ int LaunchpadDevice::stateToVelocity(int state)
     case 3:  return 0x3f;
     default: return 0x00;
     }
+}
+
+LaunchpadDevice::Corner LaunchpadDevice::noteToCorner(int note)
+{
+    switch (note) {
+    case 0:   return TopLeft;
+    case 7:   return TopRight;
+    case 112: return BottomLeft;
+    case 119: return BottomRight;
+    default:  return Invalid;
+    }
+}
+
+LaunchpadDevice::Rotation LaunchpadDevice::computeRotation(Corner source, Corner target)
+{
+    return Rotation((int(target) - int(source) + 4) % 4);
 }
 
 void LaunchpadDevice::connected()

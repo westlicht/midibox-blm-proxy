@@ -3,26 +3,68 @@
 #include "Debug.h"
 #include "BLM.h"
 #include "MidiMessage.h"
+#include "Settings.h"
+
+#include <set>
+
+static const int calibrationPattern[] = {
+    0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 1, 1, 0, 0, 0,   0, 0, 1, 1, 1, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 0, 1, 1, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 1, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 1, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 1, 1, 1, 1, 0, 0,
+
+    0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 1, 1, 1, 0, 0, 0,   0, 0, 1, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 1, 0, 0,   0, 0, 1, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 0, 1, 0, 0,   0, 0, 1, 0, 1, 0, 0, 0,
+    0, 0, 1, 1, 1, 0, 0, 0,   0, 0, 1, 1, 1, 1, 0, 0,
+    0, 0, 0, 0, 0, 1, 0, 0,   0, 0, 0, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 0, 1, 0, 0,   0, 0, 0, 0, 1, 0, 0, 0,
+    0, 0, 1, 1, 1, 0, 0, 0,   0, 0, 0, 0, 1, 0, 0, 0,
+};
 
 LaunchpadController::LaunchpadController() :
     _state(Normal)
 {
     for (int i = 0; i < MaxDevices; ++i) {
         _devices.emplace_back(new LaunchpadDevice(this, i));
+        _deviceMap.emplace_back(i);
+        _revDeviceMap.emplace_back(i);
     }
 
     _devices[0]->setRotation(LaunchpadDevice::Rotation270);
+
+    // Load settings
+    const auto &json = Settings::instance().json()["launchpad"];
+    if (json["deviceMap"].is_array() && json["deviceMap"].array_items().size() == MaxDevices) {
+        for (int i = 0; i < MaxDevices; ++i) {
+            _deviceMap[i] = std::max(0, std::min(MaxDevices - 1, json["deviceMap"].array_items()[i].int_value()));
+        }
+    }
+    if (json["rotation"].is_array() && json["rotation"].array_items().size() == MaxDevices) {
+        for (int i = 0; i < MaxDevices; ++i) {
+            _devices[i]->setRotation(LaunchpadDevice::Rotation(std::max(0, std::min(3, json["rotation"].array_items()[i].int_value()))));
+        }
+    }
 }
 
 LaunchpadController::~LaunchpadController()
 {
+    // Save settings
+    // TODO
+    auto &json = Settings::instance().json()["launchpad"];
+    //json["deviceMap"] = json11::Json(_deviceMap);
 }
 
 void LaunchpadController::handleMessage(LaunchpadDevice *device, const MidiMessage &msg)
 {
     DBG("Launchpad %d received %s", device->index(), msg);
 
-    int deviceIndex = device->index();
+    int deviceIndex = _revDeviceMap[device->index()];
 
     switch (_state) {
     case Normal: {
@@ -119,12 +161,14 @@ void LaunchpadController::handleMessage(LaunchpadDevice *device, const MidiMessa
 
     } break;
     case Calibration: {
-        if (msg.isNoteOn() && msg.velocity() != 0 && (msg.note() == 0 || msg.note() == 7 || msg.note() == 112 || msg.note() == 119)) {
-            _calibrationData.emplace_back(deviceIndex, msg.note());
+        if (msg.isNoteOn() && msg.velocity() != 0) {
+            LaunchpadDevice::Corner corner = LaunchpadDevice::noteToCorner(msg.note());
+            if (corner != LaunchpadDevice::Invalid) {
+                _calibrationData.emplace_back(deviceIndex, corner);
+            }
         }
         if (_calibrationData.size() >= 4) {
-            clearLeds();
-            _state = Normal;
+            finishCalibration();
         }
 
     } break;
@@ -143,6 +187,60 @@ void LaunchpadController::startCalibration()
         device->setGridLed(7, 0, 3);
         device->setGridLed(7, 7, 3);
         device->setGridLed(0, 7, 3);
+    }
+}
+
+void LaunchpadController::finishCalibration()
+{
+    DBG("Finish calibration ...");
+    _state = Normal;
+    clearLeds();
+    std::set<int> devices;
+    for (auto data : _calibrationData) {
+        devices.emplace(data.first);
+    }
+    if (devices.size() == 2)  {
+        // 2 Launchpads -> 16x8 mode
+        DBG("Using 16x8 mode");
+        _deviceMap[0] = _calibrationData[0].first;
+        _deviceMap[1] = _calibrationData[1].first;
+        _devices[_deviceMap[0]]->setRotation(LaunchpadDevice::computeRotation(_calibrationData[0].second, LaunchpadDevice::TopLeft));
+        _devices[_deviceMap[1]]->setRotation(LaunchpadDevice::computeRotation(_calibrationData[1].second, LaunchpadDevice::TopRight));
+
+        DBG("First launchpad id = %d", _calibrationData[0].first);
+        DBG("Second launchpad id = %d", _calibrationData[1].first);
+
+        DBG("First launchpad rotation = %d", LaunchpadDevice::computeRotation(_calibrationData[0].second, LaunchpadDevice::TopLeft));
+        DBG("Second launchpad rotation = %d", LaunchpadDevice::computeRotation(_calibrationData[1].second, LaunchpadDevice::TopRight));
+
+
+    } else if (devices.size() == 4) {
+        // 4 Launchpads -> 16x16 mode
+        DBG("Using 16x16 mode");
+        _deviceMap[0] = _calibrationData[0].first;
+        _deviceMap[1] = _calibrationData[1].first;
+        _deviceMap[2] = _calibrationData[3].first;
+        _deviceMap[3] = _calibrationData[2].first;
+        _devices[_deviceMap[0]]->setRotation(LaunchpadDevice::computeRotation(_calibrationData[0].second, LaunchpadDevice::TopLeft));
+        _devices[_deviceMap[1]]->setRotation(LaunchpadDevice::computeRotation(_calibrationData[1].second, LaunchpadDevice::TopRight));
+        _devices[_deviceMap[2]]->setRotation(LaunchpadDevice::computeRotation(_calibrationData[3].second, LaunchpadDevice::BottomLeft));
+        _devices[_deviceMap[3]]->setRotation(LaunchpadDevice::computeRotation(_calibrationData[2].second, LaunchpadDevice::BottomRight));
+
+    } else {
+        // Invalid number of Launchpads
+        DBG("Invalid number of launchpads");
+
+    }
+
+    for (int i = 0; i < _deviceMap.size(); ++i) {
+        _revDeviceMap[_deviceMap[i]] = i;
+    }
+
+    const int *data = calibrationPattern;
+    for (int y = 0; y < 16; ++y) {
+        for (int x = 0; x < 16; ++x) {
+            setGridLed(x, y, *data++);
+        }
     }
 }
 
@@ -171,7 +269,7 @@ void LaunchpadController::setGridLed(int x, int y, int state)
     }
 
     if (deviceIndex >= 0) {
-        LaunchpadDevice *device = _devices[deviceIndex].get();
+        LaunchpadDevice *device = _devices[_deviceMap[deviceIndex]].get();
         switch (device->rotation()) {
         case LaunchpadDevice::Rotation0:
             device->sendMessage(MidiMessage(0x90, col + row*0x10, velocity));
@@ -206,7 +304,7 @@ void LaunchpadController::setExtraColumnLed(int x, int y, int state)
     }
 
     if (deviceIndex >= 0) {
-        LaunchpadDevice *device = _devices[deviceIndex].get();
+        LaunchpadDevice *device = _devices[_deviceMap[deviceIndex]].get();
         switch (device->rotation()) {
         case LaunchpadDevice::Rotation0:
             device->sendMessage(MidiMessage(0x90, 0x08 + index*0x10, velocity));
@@ -241,7 +339,7 @@ void LaunchpadController::setExtraRowLed(int x, int y, int state)
     }
 
     if (deviceIndex >= 0) {
-        LaunchpadDevice *device = _devices[deviceIndex].get();
+        LaunchpadDevice *device = _devices[_deviceMap[deviceIndex]].get();
         switch (device->rotation()) {
         case LaunchpadDevice::Rotation0:
             device->sendMessage(MidiMessage(0xb0, 0x68 + index, velocity));
