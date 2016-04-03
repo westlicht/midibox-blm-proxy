@@ -3,22 +3,22 @@
 #include <chrono>
 #include <algorithm>
 
-std::vector<Timer *> Timer::_timers;
+int Timer::_nextId = 1;
+std::vector<Timer::Item> Timer::_items;
 
 Timer::~Timer()
 {
     stopTimer();
 }
 
-void Timer::startTimer(int intervalMs)
+int Timer::startTimer(int interval)
 {
-    _interval = intervalMs;
-    addTimer(this);
+    return addTimer(this, interval);
 }
 
-void Timer::stopTimer()
+void Timer::stopTimer(int id)
 {
-    removeTimer(this);
+    removeTimer(this, id);
 }
 
 void Timer::updateTimers()
@@ -29,26 +29,43 @@ void Timer::updateTimers()
         last = std::chrono::high_resolution_clock::now();
         initialized = true;
     }
+
     auto now = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - last).count();
+    auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - last).count();
     last = now;
 
-    for (auto timer : _timers) {
-        timer->_timeLeft -= duration;
-        while (timer->_timeLeft <= 0) {
-            timer->handleTimer();
-            timer->_timeLeft += timer->_interval;
-        }
+    for (auto &item : _items) {
+        item.update(delta);
     }
 }
 
-void Timer::addTimer(Timer *timer)
+int Timer::addTimer(Timer *timer, int interval)
 {
-    timer->_timeLeft = timer->_interval;
-    _timers.emplace_back(timer);
+    _items.emplace_back(timer, _nextId++, interval);
+    return _items.back()._id;
 }
 
-void Timer::removeTimer(Timer *timer)
+void Timer::removeTimer(Timer *timer, int id)
 {
-    _timers.erase(std::remove(_timers.begin(), _timers.end(), timer), _timers.end());
+    //_items.erase(_items.begin(), std::remove_if(_items.begin(), _items.end(), [&] (const Item &item) {
+    _items.erase(std::remove_if(_items.begin(), _items.end(), [&] (const Item &item) {
+        return timer == item._timer && (id == -1 || id == item._id);
+    }), _items.end());
+}
+
+Timer::Item::Item(Timer *timer, int id, int interval) :
+    _timer(timer),
+    _id(id),
+    _interval(interval),
+    _timeLeft(interval)
+{
+}
+
+void Timer::Item::update(int delta)
+{
+    _timeLeft -= delta;
+    while (_timeLeft <= 0) {
+        _timer->handleTimer(_id);
+        _timeLeft += _interval;
+    }
 }

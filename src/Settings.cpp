@@ -11,6 +11,8 @@ using namespace json11;
 
 void Settings::load(const filesystem::path &path)
 {
+    _path = path;
+
     std::ifstream is(path.make_absolute().str());
     std::stringstream ss;
     ss << is.rdbuf();
@@ -24,8 +26,16 @@ void Settings::load(const filesystem::path &path)
     DBG("Settings = %s", _json.dump());
 }
 
-void Settings::save(const filesystem::path &path) const
+void Settings::error(const std::string &path, const std::string &message)
 {
+    throw Exception(
+        "Invalid application configuration in \"%s\"!\n"
+        "Configuration path: %s\n"
+        "%s",
+        _path,
+        path,
+        message
+    );
 }
 
 Settings &Settings::instance()

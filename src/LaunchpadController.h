@@ -7,15 +7,22 @@
 #include <vector>
 #include <memory>
 
+//! Launchpad controller.
 class LaunchpadController : public Controller {
 public:
+    //! Constructor.
     LaunchpadController();
+    //! Destructor.
     ~LaunchpadController();
 
-    void handleMessage(LaunchpadDevice *device, const MidiMessage &msg);
-    void startCalibration();
-    void finishCalibration();
+    //! Called when a launchpad device is connected.
+    void deviceConnected(LaunchpadDevice *device);
+    //! Called when a launchpad device is disconnected.
+    void deviceDisconnected(LaunchpadDevice *device);
+    //! Called when a launchpad device received a MIDI message.
+    void deviceMessage(LaunchpadDevice *device, const MidiMessage &msg);
 
+    // Controller methods.
     void clearLeds() override;
     void setGridLed(int x, int y, int state) override;
     void setExtraColumnLed(int x, int y, int state) override;
@@ -23,17 +30,6 @@ public:
     void setShiftLed(int state) override;
 
 private:
-    static const int MaxDevices = 4;
-
+    int _count;
     std::vector<std::unique_ptr<LaunchpadDevice>> _devices;
-    std::vector<int> _deviceMap;
-    std::vector<int> _revDeviceMap;
-
-    enum State {
-        Normal,
-        Calibration,
-    };
-    State _state;
-
-    std::vector<std::pair<int, LaunchpadDevice::Corner>> _calibrationData;
 };

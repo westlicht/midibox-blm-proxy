@@ -3,53 +3,86 @@
 #include "Debug.h"
 #include "Settings.h"
 
+#include <oscpkt/oscpkt.h>
+
 #include <cstring>
 
+static const int idlePattern[] = {
+    0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 1, 1, 0, 0, 0,   0, 0, 1, 1, 1, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 0, 1, 1, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 1, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 1, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0, 0,   0, 0, 1, 1, 1, 1, 0, 0,
+
+    0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 1, 1, 1, 0, 0, 0,   0, 0, 1, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 1, 0, 0,   0, 0, 1, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 0, 1, 0, 0,   0, 0, 1, 0, 1, 0, 0, 0,
+    0, 0, 1, 1, 1, 0, 0, 0,   0, 0, 1, 1, 1, 1, 0, 0,
+    0, 0, 0, 0, 0, 1, 0, 0,   0, 0, 0, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 0, 1, 0, 0,   0, 0, 0, 0, 1, 0, 0, 0,
+    0, 0, 1, 1, 1, 0, 0, 0,   0, 0, 0, 0, 1, 0, 0, 0,
+};
+
 BLM::BLM() :
+    _controller(nullptr),
+    _layout(Full),
+    _state(WaitController),
+    _blmReady(false),
+    _controllerReady(false),
     _colors(2),
     _cols(16),
     _rows(8),
-    _controller(nullptr)
+    _idleCounter(0)
 {
     std::memset(_buttonState, 0, sizeof(_buttonState));
 
-    std::string port = Settings::instance().json()["blm"]["port"].string_value();
-    if (port.empty()) {
-        throw Exception("Invalid BLM MIDI port '%s'", port);
+    // Read protocol configuration and setup MIDI or OSC protocol
+    Settings &settings = Settings::instance();
+    std::string protocol = settings.json()["blm"]["protocol"].string_value();
+    if (protocol == "midi") {
+        _protocol = MIDI;
+        std::string port = settings.json()["blm"]["midi"]["port"].string_value();
+        if (port.empty()) {
+            settings.error("blm.midi.port", "Empty or missing MIDI port configuration!");
+        }
+        Midi::addDevice(this, port);
+    } else if (protocol == "osc") {
+        _protocol = OSC;
+        std::string remoteHost = settings.json()["blm"]["osc"]["remoteHost"].string_value();
+        if (remoteHost.empty()) {
+            settings.error("blm.osc.remoteHost", "Empty or missing OSC remote host configuration!");
+        }
+        int remotePort = settings.json()["blm"]["osc"]["remotePort"].int_value();
+        if (remotePort == 0) {
+            settings.error("blm.osc.remotePort", "Empty or missing OSC remote port configuration!");
+        }
+        int localPort = settings.json()["blm"]["osc"]["localPort"].int_value();
+        if (localPort == 0) {
+            settings.error("blm.osc.localPort", "Empty or missing OSC local port configuration!");
+        }
+        if (!_socket.connect(remoteHost, localPort, remotePort)) {
+            throw Exception("Failed to open socket (remoteHost=%s, localPort=%d, remotePort=%d)", remoteHost, localPort, remotePort);
+        }
+        _oscTimer = startTimer(1);
+    } else {
+        settings.error("blm.protocol", "Invalid protocol configuration, expecting either \"midi\" or \"osc\"!");
     }
-    Midi::addDevice(this, port);
+
+    _updateTimer = startTimer(1000);
+    update();
+    //_idleTimer = startTimer(25);
+    //_ackTimer = startTimer(5000);
 }
 
 BLM::~BLM()
 {
-    Midi::removeDevice(this);
-}
-
-void BLM::connected()
-{
-    DBG("BLM connected");
-
-    sendLayout();
-    startTimer(5000);
-}
-
-void BLM::disconnected()
-{
-    DBG("BLM disconnected");
-
-    stopTimer();
-}
-
-void BLM::handleMessage(const MidiMessage &msg)
-{
-    //DBG("BLM received %s", msg);
-
-    handleBlmMessage(msg);
-}
-
-void BLM::handleTimer()
-{
-    sendAck();
+    if (_protocol == MIDI) {
+        Midi::removeDevice(this);
+    }
 }
 
 void BLM::setController(Controller *controller)
@@ -63,6 +96,26 @@ void BLM::setController(Controller *controller)
     }
 }
 
+void BLM::controllerConnected(Layout layout)
+{
+    DBG("Controller connected");
+    _controllerReady = true;
+    setLayout(layout);
+}
+
+void BLM::controllerDisconnected()
+{
+    DBG("Controller disconnected");
+    _controllerReady = false;
+}
+
+void BLM::setLayout(Layout layout)
+{
+    _layout = layout;
+    _cols = 16;
+    _rows = _layout == Half ? 8 : 16;
+}
+
 int BLM::buttonState(int col, int row) const
 {
     return _buttonState[col][row];
@@ -71,14 +124,54 @@ int BLM::buttonState(int col, int row) const
 void BLM::setButtonState(int col, int row, int state)
 {
     _buttonState[col][row] = state;
-    if (col < MaxColsExtraOffset && row < MaxRowsExtraOffset) {
-        _controller->setGridLed(col, row, state);
-    } else if (col == MaxColsExtraOffset && row < MaxRowsExtraOffset) {
-        _controller->setExtraColumnLed(0, row, state);
-    } else if (col == (MaxColsExtraOffset+1) && row < MaxRowsExtraOffset) {
-        _controller->setExtraColumnLed(1, row, state);
-    } else if (col < MaxColsExtraOffset && row == MaxRowsExtraOffset) {
-        _controller->setExtraRowLed(col, 0, state);
+    if (_state == Running) {
+        sendButtonState(col, row, state);
+    }
+}
+
+void BLM::sendNoteEvent(int channel, int note, int velocity)
+{
+    if (_state == Running) {
+        sendMessageActiveProtocol(MidiMessage::noteOn(channel, note, velocity));
+    }
+}
+
+void BLM::dump()
+{
+    for (int row = 0; row < MaxRows; ++row) {
+        for (int col = 0; col < MaxCols; ++col) {
+            std::cout << _buttonState[col][row] << "  ";
+        }
+        std::cout << std::endl;
+    }
+}
+
+void BLM::connected()
+{
+    DBG("BLM connected via MIDI");
+}
+
+void BLM::disconnected()
+{
+    DBG("BLM disconnected via MIDI");
+    _blmReady = false;
+}
+
+void BLM::handleMessage(const MidiMessage &msg)
+{
+    DBG("BLM received %s", msg);
+
+    handleBlmMessage(msg);
+}
+
+void BLM::handleTimer(int id)
+{
+    if (id == _updateTimer) {
+        update();
+    } else  if (id == _idleTimer) {
+        updateIdlePattern();
+    } else if (id == _oscTimer) {
+        handleOscInput();
     }
 }
 
@@ -155,7 +248,7 @@ void BLM::handleBlmMessage(const MidiMessage &msg)
             setButtonState(MaxColsExtraOffset, MaxRowsExtraOffset, state);
         }
 
-        // TODO midiDataReceived = true;
+        _blmReady = true;
     } break;
     case 0xb: {
         int pattern = data2;
@@ -212,7 +305,7 @@ void BLM::handleBlmMessage(const MidiMessage &msg)
         case 0x6a: if (channel == 0) setLedPattern8_H(8, MaxRowsExtraOffset, 1, pattern); break;
         }
 
-    // TODO midiDataReceived = true;
+        _blmReady = true;
     } break;
 
     case 0xf: {
@@ -226,13 +319,46 @@ void BLM::handleBlmMessage(const MidiMessage &msg)
             data[5] == 0x00)   // Device ID
         {
             if (data[6] == 0x00 && data[7] == 0x00) {
+                _blmReady = true;
                 // no error checking... just send layout (the hardware version will check better)
                 sendLayout();
             } else if (data[6] == 0x0f && data[7] == 0xf7) {
+                _blmReady = true;
                 sendAck();
             }
         }
     } break;
+    }
+}
+
+void BLM::handleOscInput()
+{
+    uint8_t data[1024];
+    int len = _socket.read(data, sizeof(data));
+    if (len > 0) {
+        oscpkt::PacketReader reader(data, len);
+        if (reader.isOk()) {
+            while (oscpkt::Message *msg = reader.popMessage()) {
+                uint32_t midi;
+                if (msg->partialMatch("/midi").popMidi(midi).isOkNoMoreArgs()) {
+                    MidiMessage midiMsg((midi >> 24) & 0xff, (midi >> 16) & 0xff, (midi >> 8) & 0xff);
+                    handleBlmMessage(midiMsg);
+                }
+            }
+        }
+    }
+}
+
+void BLM::sendButtonState(int col, int row, int state)
+{
+    if (col < MaxColsExtraOffset && row < MaxRowsExtraOffset) {
+        _controller->setGridLed(col, row, state);
+    } else if (col == MaxColsExtraOffset && row < MaxRowsExtraOffset) {
+        _controller->setExtraColumnLed(0, row, state);
+    } else if (col == (MaxColsExtraOffset+1) && row < MaxRowsExtraOffset) {
+        _controller->setExtraColumnLed(1, row, state);
+    } else if (col < MaxColsExtraOffset && row == MaxRowsExtraOffset) {
+        _controller->setExtraRowLed(col, 0, state);
     }
 }
 
@@ -253,7 +379,7 @@ void BLM::sendLayout()
     sysex[11] = 1; // number of extra columns
     sysex[12] = 1; // number of extra buttons (e.g. shift)
     sysex[13] = 0xf7;
-    sendMessage(MidiMessage(sysex));
+    sendMessageActiveProtocol(MidiMessage(sysex));
 }
 
 void BLM::sendAck()
@@ -268,20 +394,96 @@ void BLM::sendAck()
     sysex[6] = 0x0f; // Acknowledge
     sysex[7] = 0x00; // dummy
     sysex[8] = 0xf7;
-    sendMessage(MidiMessage(sysex));
+    sendMessageActiveProtocol(MidiMessage(sysex));
 }
 
-void BLM::sendNoteEvent(int channel, int note, int velocity)
+void BLM::sendMessageActiveProtocol(const MidiMessage &msg)
 {
-    sendMessage(MidiMessage(0x90 | channel, note, velocity));
-}
+    if (_protocol == MIDI) {
+        sendMessage(msg);
+    } else if (_protocol == OSC) {
+        int oscPort = 0;
+        oscpkt::Message oscMsg(tfm::format("/midi%d", oscPort + 1));
 
-void BLM::dump()
-{
-    for (int row = 0; row < _rows; ++row) {
-        for (int col = 0; col < _cols; ++col) {
-            std::cout << _buttonState[col][row] << "  ";
+        const auto &data = msg.data();
+
+        if (msg.isSysex()) {
+            oscMsg.pushBlob((void *)(data.data()), data.size());
+        } else {
+            uint32_t midi = 0;
+            for (int i = 0; i < 3; ++i) {
+                midi |= data[i] << ((3 - i) * 8);
+            }
+            oscMsg.pushMidi(midi);
         }
-        std::cout << std::endl;
+
+        oscpkt::PacketWriter writer;
+        writer.addMessage(oscMsg);
+        bool ok = _socket.write((const unsigned char *)writer.packetData(), writer.packetSize());
+        if (!ok) {
+            DBG("failed to send OSC packet");
+        }
     }
+}
+
+void BLM::update()
+{
+    switch (_state) {
+    // Wait for controller to connect
+    case WaitController:
+        if (_idleTimer == 0) {
+            _idleTimer = startTimer(25);
+        }
+        if (_controllerReady) {
+            _blmReady = false;
+            sendLayout();
+            sendAck();
+            _state = WaitBlm;
+        }
+        break;
+    // Wait for BLM to connect
+    case WaitBlm:
+        if (_controllerReady && _blmReady) {
+            if (_idleTimer != 0) {
+                stopTimer(_idleTimer);
+                _idleTimer = 0;
+            }
+            _controller->clearLeds();
+            for (int row = 0; row < MaxRows; ++row) {
+                for (int col = 0; col < MaxCols; ++col) {
+                    sendButtonState(col, row, _buttonState[col][row]);
+                }
+            }
+            _state = Running;
+        } else {
+            _state = WaitController;
+        }
+        break;
+    // Running
+    case Running:
+        if (_controllerReady && _blmReady) {
+            sendAck();
+        } else {
+            _state = WaitController;
+        }
+        break;
+    }
+}
+
+void BLM::updateIdlePattern()
+{
+    for (int y = 0; y < 16; ++y) {
+        for (int x = 0; x < 16; ++x) {
+            int state = idlePattern[y * 16 + x];
+            if (_idleCounter % 16 == y) {
+                state = state ? 1 : 2;
+            }
+            sendButtonState(x, y, state);
+        }
+        sendButtonState(MaxRowsExtraOffset, y, _idleCounter % 16 == y ? 2 : 0);
+        sendButtonState(MaxRowsExtraOffset + 1, y, _idleCounter % 16 == y ? 2 : 0);
+        sendButtonState(y, MaxColsExtraOffset, _idleCounter % 16 == 0 ? 2 : 0);
+    }
+
+    ++_idleCounter;
 }

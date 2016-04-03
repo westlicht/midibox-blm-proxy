@@ -14,6 +14,7 @@
 #include <thread>
 #include <csignal>
 
+
 static bool terminate = false;
 
 static void signalHandler(int sig)
@@ -41,7 +42,7 @@ int main(int argc, char *argv[])
     try {
         options.parse(argc, argv);
     } catch (const std::exception &e) {
-        std::cerr << "Error during command line parsing: " << e.what() << std::endl;
+        std::cout << "Error during command line parsing: " << e.what() << std::endl;
         return 1;
     }
 
@@ -58,12 +59,12 @@ int main(int argc, char *argv[])
         if (listDevices) {
             Midi::update();
             std::cout << "Midi Inputs:" << std::endl;
-            for (const auto port : Midi::inputPorts()) {
+            for (const auto &port : Midi::inputPorts()) {
                 std::cout << "  " << port << std::endl;
             }
             std::cout << std::endl;
             std::cout << "Midi Outputs:" << std::endl;
-            for (const auto port : Midi::outputPorts()) {
+            for (const auto &port : Midi::outputPorts()) {
                 std::cout << "  " << port << std::endl;
             }
             std::cout << std::endl;
@@ -91,17 +92,18 @@ int main(int argc, char *argv[])
 
         // Create controller
         std::unique_ptr<Controller> controller;
-
         std::string controllerType = Settings::instance().json()["controller"]["type"].string_value();
         if (controllerType == "launchpad") {
             controller.reset(new LaunchpadController());
         } else {
-            throw Exception("Invalid controller type '%s'", controllerType);
+            Settings::instance().error("controller.type", "Missing or invalid controller type, currently only supports \"launchpad\"!");
         }
 
+        // Create BLM
         BLM blm;
         blm.setController(controller.get());
 
+        // Main loop
         while (!terminate) {
             Midi::update();
             Timer::updateTimers();
@@ -115,8 +117,9 @@ int main(int argc, char *argv[])
 
         blm.setController(nullptr);
 
-    } catch (Exception &e) {
-        std::cout << "Exception: " << e.what() << std::endl;
+    } catch (const std::exception &e) {
+        std::cout << "!!! Exception !!!" << std::endl;
+        std::cout << e.what() << std::endl;
         return 1;
     }
 
