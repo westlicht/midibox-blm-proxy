@@ -2,6 +2,7 @@
 
 class BLM;
 
+//! Abstract interface for controllers.
 class Controller {
 public:
     void setBLM(BLM *blm) { _blm = blm; }
