@@ -88,6 +88,7 @@ BLM::~BLM()
 void BLM::setController(Controller *controller)
 {
     if (_controller) {
+        _controller->clearLeds();
         _controller->setBLM(nullptr);
     }
     _controller = controller;
