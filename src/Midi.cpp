@@ -53,7 +53,6 @@ void Midi::checkDevices()
     }
 
     if (inputPorts != _inputPorts || outputPorts != _outputPorts) {
-        // TODO std::cout << "Connected MIDI devices changed!" << std::endl;
         _inputPorts = inputPorts;
         _outputPorts = outputPorts;
 
@@ -69,18 +68,25 @@ void Midi::checkDevices()
 
         // TODO this assumes that input and output ports are in the same order!
 
-        auto isMatchingPort = [] (const std::string &a, const std::string &b) {
-            return b.compare(0, a.size(), a) == 0;
+        auto isMatchingPort = [] (const std::string &a, const std::string &b, const std::string &c) {
+            return b.compare(0, a.size(), a) == 0 &&
+                   c.compare(0, a.size(), a) == 0;
         };
 
         for (int i = 0; i < _inputPorts.size(); ++i) {
             for (auto device : _devices) {
-                if (!device->_connected && isMatchingPort(device->_midiPort, _inputPorts[i])) {
-                    device->_midiIn.openPort(i);
-                    device->_midiIn.setCallback(callback, device);
-                    device->_midiOut.openPort(i);
-                    device->_connected = true;
-                    device->connected();
+                if (!device->_connected && isMatchingPort(device->_midiPort, _inputPorts[i], _outputPorts[i])) {
+                    try {
+                        device->_midiIn.openPort(i);
+                        device->_midiIn.setCallback(callback, device);
+                        device->_midiOut.openPort(i);
+                        device->_connected = true;
+                        device->connected();
+                    } catch (const std::exception &e) {
+                        device->_midiIn.cancelCallback();
+                        device->_midiIn.closePort();
+                        device->_midiOut.closePort();
+                    }
                     break;
                 }
             }
