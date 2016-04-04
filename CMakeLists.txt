@@ -52,3 +52,4 @@ include_directories(ext)
 add_executable(blm-proxy ${SOURCES})
 target_link_libraries(blm-proxy ${EXTRA_LIBS})
 
+install(TARGETS blm-proxy RUNTIME DESTINATION bin)
