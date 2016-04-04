@@ -83,11 +83,16 @@ int main(int argc, char *argv[])
         candidates.emplace_back(filesystem::path("/etc") / "blm-proxy.conf");
 
         Settings settings;
+        bool found = false;
         for (auto path : candidates) {
             if (path.exists() && path.is_file()) {
                 DBG("Loading settings from %s", path);
                 Settings::instance().load(path);
+                found = true;
             }
+        }
+        if (!found) {
+            throw Exception("No application configuration file found!");
         }
 
         // Create controller
