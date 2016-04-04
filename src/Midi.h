@@ -11,6 +11,7 @@ public:
     //! Checks if registered MIDI devices are connected/disconnected.
     //! Needs to be called periodically.
     static void update();
+    static void shutdown();
 
     //! Registers a MIDI device.
     static void addDevice(MidiDevice *device, const std::string &name);
