@@ -1,5 +1,6 @@
 
 #include "BLM.h"
+#include "Version.h"
 #include "LaunchpadController.h"
 #include "Midi.h"
 #include "Timer.h"
@@ -25,7 +26,7 @@ static void signalHandler(int sig)
 
 int main(int argc, char *argv[])
 {
-    cxxopts::Options options(argv[0], " - MIDIbox BLM proxy");
+    cxxopts::Options options(argv[0], tfm::format(" - MIDIbox BLM proxy (version: %s)", Version::string()));
 
     bool listDevices = false;
     bool debugMode = false;
@@ -51,6 +52,8 @@ int main(int argc, char *argv[])
         std::cout << options.help() << std::endl;
         return 0;
     }
+
+    std::cout << tfm::format("blm-proxy %s", Version::string()) << std::endl;
 
     Debug::enabled = debugMode;
 
@@ -83,11 +86,16 @@ int main(int argc, char *argv[])
         candidates.emplace_back(filesystem::path("/etc") / "blm-proxy.conf");
 
         Settings settings;
+        bool found = false;
         for (auto path : candidates) {
             if (path.exists() && path.is_file()) {
                 DBG("Loading settings from %s", path);
                 Settings::instance().load(path);
+                found = true;
             }
+        }
+        if (!found) {
+            throw Exception("No application configuration file found!");
         }
 
         // Create controller
