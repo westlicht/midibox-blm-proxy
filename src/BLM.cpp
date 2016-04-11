@@ -74,8 +74,6 @@ BLM::BLM() :
 
     _updateTimer = startTimer(1000);
     update();
-    //_idleTimer = startTimer(25);
-    //_ackTimer = startTimer(5000);
 }
 
 BLM::~BLM()
